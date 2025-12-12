@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Settings - GST Billing System{% endblock %}
+{% block content %}
+<h1 class="mb-4">Company Settings</h1>
+<div class="card">
+    <div class="card-body">
+        <form id="settingsForm">
+            <div class="mb-3"><label class="form-label">Company Name *</label><input type="text" class="form-control" id="companyName" required></div>
+            <div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" id="companyAddress" rows="2"></textarea></div>
+            <div class="row">
+                <div class="col-md-4 mb-3"><label class="form-label">City</label><input type="text" class="form-control" id="companyCity"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">State</label><input type="text" class="form-control" id="companyState"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Pincode</label><input type="text" class="form-control" id="companyPincode"></div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3"><label class="form-label">GSTIN *</label><input type="text" class="form-control" id="companyGstin" required></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" id="companyPhone"></div>
+                <div class="col-md-4 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="companyEmail"></div>
+            </div>
+            <div class="mb-3"><label class="form-label">Terms &amp; Conditions</label><textarea class="form-control" id="companyTerms" rows="3" placeholder="Enter invoice terms and conditions..."></textarea></div>
+            <div class="mb-3">
+                <label class="form-label">Banking Details</label>
+                <div class="row g-2">
+                    <div class="col-md-6"><input type="text" class="form-control" id="bankAccountName" placeholder="Account Name"></div>
+                    <div class="col-md-6"><input type="text" class="form-control" id="bankAccountNumber" placeholder="Account Number"></div>
+                    <div class="col-md-4 mt-2"><input type="text" class="form-control" id="bankIfsc" placeholder="IFSC"></div>
+                    <div class="col-md-4 mt-2"><input type="text" class="form-control" id="bankName" placeholder="Bank Name"></div>
+                    <div class="col-md-4 mt-2"><input type="text" class="form-control" id="bankBranch" placeholder="Branch"></div>
+                    <div class="col-md-6 mt-2"><input type="text" class="form-control" id="bankUpi" placeholder="UPI ID (optional)"></div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    async function loadSettings() {
+        const response = await fetch('/api/settings');
+        const settings = await response.json();
+        document.getElementById('companyName').value = settings.company_name || '';
+        document.getElementById('companyAddress').value = settings.address || '';
+        document.getElementById('companyCity').value = settings.city || '';
+        document.getElementById('companyState').value = settings.state || '';
+        document.getElementById('companyPincode').value = settings.pincode || '';
+        document.getElementById('companyGstin').value = settings.gstin || '';
+        document.getElementById('companyPhone').value = settings.phone || '';
+        document.getElementById('companyEmail').value = settings.email || '';
+        document.getElementById('companyTerms').value = settings.terms_and_conditions || '';
+
+        const banking = (settings.banking_details || '').split('\n');
+        document.getElementById('bankAccountName').value = banking[0] || '';
+        document.getElementById('bankAccountNumber').value = banking[1] || '';
+        document.getElementById('bankIfsc').value = banking[2] || '';
+        document.getElementById('bankName').value = banking[3] || '';
+        document.getElementById('bankBranch').value = banking[4] || '';
+        document.getElementById('bankUpi').value = banking[5] || '';
+    }
+    async function saveSettings() {
+        const data = {
+            company_name: document.getElementById('companyName').value,
+            address: document.getElementById('companyAddress').value,
+            city: document.getElementById('companyCity').value,
+            state: document.getElementById('companyState').value,
+            pincode: document.getElementById('companyPincode').value,
+            gstin: document.getElementById('companyGstin').value,
+            phone: document.getElementById('companyPhone').value,
+            email: document.getElementById('companyEmail').value,
+            terms_and_conditions: document.getElementById('companyTerms').value,
+            banking_details: [
+                document.getElementById('bankAccountName').value,
+                document.getElementById('bankAccountNumber').value,
+                document.getElementById('bankIfsc').value,
+                document.getElementById('bankName').value,
+                document.getElementById('bankBranch').value,
+                document.getElementById('bankUpi').value
+            ].join('\n')
+        };
+        const response = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (response.ok) alert('Settings saved successfully!');
+    }
+    loadSettings();
+</script>
+{% endblock %}

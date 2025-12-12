@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Create Invoice - GST Billing System{% endblock %}
+{% block content %}
+<h1 class="mb-4">Create New Invoice</h1>
+<div class="card">
+    <div class="card-body">
+        <form id="invoiceForm">
+            <div class="row mb-3">
+                <div class="col-md-4"><label>Invoice Number *</label><input type="text" class="form-control" id="invoiceNumber" required></div>
+                <div class="col-md-4"><label>Invoice Date *</label><input type="date" class="form-control" id="invoiceDate" required></div>
+                <div class="col-md-4"><label>Due Date</label><input type="date" class="form-control" id="dueDate"></div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6"><label>Mode of Transport</label><input type="text" class="form-control" id="modeOfTransport" placeholder="e.g. Road, Rail, Air"></div>
+            </div>
+            <div class="mb-3"><label>Client *</label><select class="form-select" id="clientSelect" required><option value="">Select Client...</option></select></div>
+            <h5 class="mt-4">Invoice Items</h5>
+            <div class="mb-3">
+                <button type="button" class="btn btn-sm btn-success" onclick="addItemRow()"><i class="bi bi-plus"></i> Add Item</button>
+                <button type="button" class="btn btn-sm btn-info" onclick="addFromProduct()"><i class="bi bi-box"></i> Add from Products</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table" id="itemsTable">
+                    <thead><tr><th>Description</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Amount</th><th>Tax%</th><th>CGST</th><th>SGST</th><th>Total</th><th></th></tr></thead>
+                    <tbody id="itemsTableBody"></tbody>
+                </table>
+            </div>
+            <div class="row">
+                <div class="col-md-8"></div>
+                <div class="col-md-4">
+                    <table class="table">
+                        <tr><td><strong>Subtotal:</strong></td><td class="text-end" id="subtotalDisplay">₹0.00</td></tr>
+                        <tr><td><strong>Total Tax:</strong></td><td class="text-end" id="taxDisplay">₹0.00</td></tr>
+                        <tr class="table-dark"><td><strong>Grand Total:</strong></td><td class="text-end" id="grandTotalDisplay">₹0.00</td></tr>
+                    </table>
+                </div>
+            </div>
+            <div class="mb-3"><label>Notes</label><textarea class="form-control" id="invoiceNotes" rows="2"></textarea></div>
+            <button type="button" class="btn btn-primary btn-lg" onclick="saveInvoice()">Create Invoice</button>
+        </form>
+    </div>
+</div>
+<div class="modal fade" id="productSelectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5>Select Product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body"><div id="productsList"></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    let items = [];
+    let products = [];
+    let clients = [];
+    async function init() {
+        const [prodsResp, clientsResp] = await Promise.all([fetch('/api/products'), fetch('/api/clients')]);
+        products = await prodsResp.json();
+        clients = await clientsResp.json();
+        document.getElementById('clientSelect').innerHTML = '<option value="">Select Client...</option>' + 
+            clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        document.getElementById('invoiceDate').valueAsDate = new Date();
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 30);
+        document.getElementById('dueDate').valueAsDate = dueDate;
+        generateInvoiceNumber();
+        addItemRow();
+    }
+    async function generateInvoiceNumber() {
+        const response = await fetch('/api/invoices');
+        const invoices = await response.json();
+        const lastNum = invoices.length > 0 ? parseInt(invoices[0].invoice_number.split('-')[1]) : 0;
+        document.getElementById('invoiceNumber').value = `INV-${String(lastNum + 1).padStart(4, '0')}`;
+    }
+    function addItemRow() {
+        const id = Date.now();
+        items.push({id, description: '', hsn_code: '', quantity: 1, rate: 0, tax_rate: 18});
+        renderItems();
+    }
+    function addFromProduct() {
+        const html = products.map(p => `
+            <div class="card mb-2">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div><strong>${p.name}</strong><br><small>HSN: ${p.hsn_code} | Stock: ${p.stock_quantity} | Price: ₹${p.unit_price}</small></div>
+                    <button class="btn btn-sm btn-primary" onclick="selectProduct(${p.id})">Add</button>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('productsList').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('productSelectModal')).show();
+    }
+    function selectProduct(pid) {
+        const product = products.find(p => p.id === pid);
+        const id = Date.now();
+        items.push({id, product_id: pid, description: product.name, hsn_code: product.hsn_code, quantity: 1, rate: product.unit_price, tax_rate: product.tax_rate});
+        renderItems();
+        bootstrap.Modal.getInstance(document.getElementById('productSelectModal')).hide();
+    }
+    function removeItem(id) { items = items.filter(i => i.id !== id); renderItems(); }
+    function updateItem(id, field, value) {
+        const item = items.find(i => i.id === id);
+        item[field] = parseFloat(value) || 0;
+        renderItems();
+    }
+    function calculateItem(item) {
+        const amount = item.quantity * item.rate;
+        const tax = amount * item.tax_rate / 100;
+        return {amount, cgst: tax/2, sgst: tax/2, total: amount + tax};
+    }
+    function renderItems() {
+        const tbody = document.getElementById('itemsTableBody');
+        let subtotal = 0, totalTax = 0;
+        tbody.innerHTML = items.map(item => {
+            const calc = calculateItem(item);
+            subtotal += calc.amount;
+            totalTax += calc.cgst + calc.sgst;
+            return `<tr>
+                <td><input type="text" class="form-control form-control-sm" value="${item.description}" onchange="updateItem(${item.id}, 'description', this.value)"></td>
+                <td><input type="text" class="form-control form-control-sm" value="${item.hsn_code || ''}" onchange="updateItem(${item.id}, 'hsn_code', this.value)" style="width:80px"></td>
+                <td><input type="number" class="form-control form-control-sm" value="${item.quantity}" onchange="updateItem(${item.id}, 'quantity', this.value)" style="width:60px"></td>
+                <td><input type="number" class="form-control form-control-sm" value="${item.rate}" onchange="updateItem(${item.id}, 'rate', this.value)" style="width:80px"></td>
+                <td>₹${calc.amount.toFixed(2)}</td>
+                <td><input type="number" class="form-control form-control-sm" value="${item.tax_rate}" onchange="updateItem(${item.id}, 'tax_rate', this.value)" style="width:60px"></td>
+                <td>₹${calc.cgst.toFixed(2)}</td>
+                <td>₹${calc.sgst.toFixed(2)}</td>
+                <td><strong>₹${calc.total.toFixed(2)}</strong></td>
+                <td><button class="btn btn-sm btn-danger" onclick="removeItem(${item.id})"><i class="bi bi-x"></i></button></td>
+            </tr>`;
+        }).join('');
+        document.getElementById('subtotalDisplay').textContent = '₹' + subtotal.toFixed(2);
+        document.getElementById('taxDisplay').textContent = '₹' + totalTax.toFixed(2);
+        document.getElementById('grandTotalDisplay').textContent = '₹' + (subtotal + totalTax).toFixed(2);
+    }
+    async function saveInvoice() {
+        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+        const totalTax = items.reduce((sum, item) => sum + (item.quantity * item.rate * item.tax_rate / 100), 0);
+        const data = {
+            invoice_number: document.getElementById('invoiceNumber').value,
+            client_id: parseInt(document.getElementById('clientSelect').value),
+            invoice_date: document.getElementById('invoiceDate').value,
+            due_date: document.getElementById('dueDate').value,
+            subtotal, total_tax: totalTax, grand_total: subtotal + totalTax,
+            mode_of_transport: document.getElementById('modeOfTransport').value,
+            notes: document.getElementById('invoiceNotes').value,
+            items: items.map(i => ({product_id: i.product_id, description: i.description, hsn_code: i.hsn_code, quantity: i.quantity, rate: i.rate, tax_rate: i.tax_rate, amount: i.quantity * i.rate}))
+        };
+        const response = await fetch('/api/invoices', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        if (response.ok) { alert('Invoice created!'); window.location.href = '/invoices'; }
+    }
+    init();
+</script>
+{% endblock %}

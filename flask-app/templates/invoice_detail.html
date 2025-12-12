@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ invoice['invoice_number'] }} - GST Billing System{% endblock %}
+{% block extra_css %}
+<style>
+    .invoice-box {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    @media print {
+        #sidebar-wrapper, nav.navbar { display: none !important; }
+        #page-content-wrapper { margin: 0; }
+        .no-print { display: none !important; }
+        body { background: #ffffff; }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <h1>Invoice {{ invoice['invoice_number'] }}</h1>
+    <div>
+        <a href="/invoices" class="btn btn-secondary me-2">Back to Invoices</a>
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-2"></i>Print
+        </button>
+    </div>
+</div>
+<div class="invoice-box">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h4>{{ settings['company_name'] if settings else 'Your Company Name' }}</h4>
+            {% if settings %}
+            <p class="mb-0">{{ settings['address'] }}</p>
+            <p class="mb-0">{{ settings['city'] }}, {{ settings['state'] }} - {{ settings['pincode'] }}</p>
+            <p class="mb-0">GSTIN: {{ settings['gstin'] }}</p>
+            <p class="mb-0">Phone: {{ settings['phone'] }}</p>
+            <p class="mb-0">Email: {{ settings['email'] }}</p>
+            {% endif %}
+        </div>
+        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+            <h5>Invoice Details</h5>
+            <p class="mb-0"><strong>Invoice #:</strong> {{ invoice['invoice_number'] }}</p>
+            <p class="mb-0"><strong>Date:</strong> {{ invoice['invoice_date'] }}</p>
+            <p class="mb-0"><strong>Due Date:</strong> {{ invoice['due_date'] or '-' }}</p>
+            <p class="mb-0"><strong>Mode of Transport:</strong> {{ invoice['mode_of_transport'] or '-' }}</p>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h5>Bill To</h5>
+            <p class="mb-0"><strong>{{ invoice['name'] }}</strong></p>
+            <p class="mb-0">{{ invoice['address'] }}</p>
+            <p class="mb-0">{{ invoice['city'] }}, {{ invoice['state'] }} - {{ invoice['pincode'] }}</p>
+            <p class="mb-0">GSTIN: {{ invoice['gstin'] }}</p>
+            <p class="mb-0">Phone: {{ invoice['phone'] }}</p>
+        </div>
+    </div>
+    <div class="table-responsive mb-4">
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Description</th>
+                    <th>HSN</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-end">Rate</th>
+                    <th class="text-end">Tax %</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item['description'] }}</td>
+                    <td>{{ item['hsn_code'] }}</td>
+                    <td class="text-end">{{ '%.2f'|format(item['quantity']) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(item['rate']) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(item['tax_rate']) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(item['amount']) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="row justify-content-end">
+        <div class="col-md-4">
+            <table class="table">
+                <tr>
+                    <th>Subtotal</th>
+                    <td class="text-end">₹{{ '%.2f'|format(invoice['subtotal']) }}</td>
+                </tr>
+                <tr>
+                    <th>CGST</th>
+                    <td class="text-end">₹{{ '%.2f'|format(invoice['total_tax'] / 2) }}</td>
+                </tr>
+                <tr>
+                    <th>SGST</th>
+                    <td class="text-end">₹{{ '%.2f'|format(invoice['total_tax'] / 2) }}</td>
+                </tr>
+                <tr>
+                    <th>Grand Total</th>
+                    <td class="text-end fw-bold">₹{{ '%.2f'|format(invoice['grand_total']) }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    {% if invoice['notes'] %}
+    <div class="mt-4">
+        <h6>Notes</h6>
+        <p>{{ invoice['notes'] }}</p>
+    </div>
+    {% endif %}
+    {% if settings and settings['terms_and_conditions'] %}
+    <div class="mt-4">
+        <h6>Terms &amp; Conditions</h6>
+        <p style="white-space: pre-line;">{{ settings['terms_and_conditions'] }}</p>
+    </div>
+    {% endif %}
+    {% if settings and settings['banking_details'] %}
+    <div class="mt-4">
+        <h6>Banking Details</h6>
+        <table class="table table-sm" style="max-width: 400px;">
+            <tbody>
+            {% for line in settings['banking_details'].split('\n') %}
+                {% if line.strip() %}
+                <tr>
+                    <td>{{ line }}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('print') === '1') {
+            window.print();
+        }
+    })();
+</script>
+{% endblock %}

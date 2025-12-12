@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Clients - GST Billing System{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Clients Management</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#clientModal" onclick="resetClientForm()">
+        <i class="bi bi-plus-circle me-2"></i>Add Client
+    </button>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr><th>Name</th><th>Email</th><th>Phone</th><th>GSTIN</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="clientsTableBody"><tr><td colspan="5" class="text-center">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="clientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clientModalTitle">Add Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="clientForm">
+                    <input type="hidden" id="clientId">
+                    <div class="mb-3"><label class="form-label">Name *</label><input type="text" class="form-control" id="clientName" required></div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="clientEmail"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" id="clientPhone"></div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" id="clientAddress" rows="2"></textarea></div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><label class="form-label">City</label><input type="text" class="form-control" id="clientCity"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">State</label><input type="text" class="form-control" id="clientState"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><label class="form-label">Pincode</label><input type="text" class="form-control" id="clientPincode"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">GSTIN</label><input type="text" class="form-control" id="clientGstin"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveClient()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    let clients = [];
+    async function loadClients() {
+        const response = await fetch('/api/clients');
+        clients = await response.json();
+        const tbody = document.getElementById('clientsTableBody');
+        tbody.innerHTML = clients.length === 0 ? '<tr><td colspan="5" class="text-center">No clients found</td></tr>' :
+            clients.map(c => `<tr>
+                <td><strong>${c.name}</strong><br><small class="text-muted">${c.address || ''} ${c.city || ''}</small></td>
+                <td>${c.email || '-'}</td>
+                <td>${c.phone || '-'}</td>
+                <td>${c.gstin || '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="editClient(${c.id})"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id})"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>`).join('');
+    }
+    function resetClientForm() {
+        document.getElementById('clientForm').reset();
+        document.getElementById('clientId').value = '';
+        document.getElementById('clientModalTitle').textContent = 'Add Client';
+    }
+    function editClient(id) {
+        const client = clients.find(c => c.id === id);
+        document.getElementById('clientId').value = client.id;
+        document.getElementById('clientName').value = client.name;
+        document.getElementById('clientEmail').value = client.email || '';
+        document.getElementById('clientPhone').value = client.phone || '';
+        document.getElementById('clientAddress').value = client.address || '';
+        document.getElementById('clientCity').value = client.city || '';
+        document.getElementById('clientState').value = client.state || '';
+        document.getElementById('clientPincode').value = client.pincode || '';
+        document.getElementById('clientGstin').value = client.gstin || '';
+        document.getElementById('clientModalTitle').textContent = 'Edit Client';
+        new bootstrap.Modal(document.getElementById('clientModal')).show();
+    }
+    async function saveClient() {
+        const id = document.getElementById('clientId').value;
+        const data = {
+            name: document.getElementById('clientName').value,
+            email: document.getElementById('clientEmail').value,
+            phone: document.getElementById('clientPhone').value,
+            address: document.getElementById('clientAddress').value,
+            city: document.getElementById('clientCity').value,
+            state: document.getElementById('clientState').value,
+            pincode: document.getElementById('clientPincode').value,
+            gstin: document.getElementById('clientGstin').value
+        };
+        const response = await fetch(id ? `/api/clients/${id}` : '/api/clients', {
+            method: id ? 'PUT' : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('clientModal')).hide();
+            await loadClients();
+            alert(id ? 'Client updated!' : 'Client added!');
+        }
+    }
+    async function deleteClient(id) {
+        if (!confirm('Delete this client?')) return;
+        await fetch(`/api/clients/${id}`, {method: 'DELETE'});
+        await loadClients();
+    }
+    loadClients();
+</script>
+{% endblock %}

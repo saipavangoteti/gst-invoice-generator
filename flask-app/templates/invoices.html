@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Invoices - GST Billing System{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Invoices</h1>
+    <a href="/create-invoice" class="btn btn-primary"><i class="bi bi-plus-circle me-2"></i>Create New Invoice</a>
+</div>
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr><th>Invoice #</th><th>Client</th><th>Date</th><th>Due Date</th><th>Amount</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="invoicesTableBody"><tr><td colspan="7" class="text-center">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+    async function loadInvoices() {
+        const response = await fetch('/api/invoices');
+        const invoices = await response.json();
+        const tbody = document.getElementById('invoicesTableBody');
+        tbody.innerHTML = invoices.length === 0 ? '<tr><td colspan="7" class="text-center">No invoices found</td></tr>' :
+            invoices.map(inv => `<tr>
+                <td><strong>${inv.invoice_number}</strong></td>
+                <td>${inv.client_name || 'N/A'}</td>
+                <td>${new Date(inv.invoice_date).toLocaleDateString()}</td>
+                <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '-'}</td>
+                <td>₹${inv.grand_total.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-info me-1" onclick="viewInvoice(${inv.id})"><i class="bi bi-eye"></i></button>
+                    <button class="btn btn-sm btn-primary me-1" onclick="printInvoice(${inv.id})"><i class="bi bi-printer"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteInvoice(${inv.id})"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>`).join('');
+    }
+    function viewInvoice(id) {
+        window.open('/invoice/' + id, '_blank');
+    }
+    function printInvoice(id) {
+        window.open('/invoice/' + id + '?print=1', '_blank');
+    }
+    async function deleteInvoice(id) {
+        if (!confirm('Are you sure you want to delete this invoice?')) {
+            return;
+        }
+        const response = await fetch('/api/invoices/' + id, { method: 'DELETE' });
+        if (response.ok) {
+            loadInvoices();
+        } else {
+            alert('Failed to delete invoice');
+        }
+    }
+    loadInvoices();
+</script>
+{% endblock %}

@@ -118,6 +118,20 @@ Once connected to GitHub:
 - Verify Next.js version compatibility
 - Check for console errors in browser
 
+### 401 Unauthorized on Vercel
+
+If visiting your deployed URL shows **401 Unauthorized** while the app works locally, it is almost always due to Vercel project protection, not this codebase.
+
+Steps to disable project protection for public access:
+
+1. Open your project in the **Vercel Dashboard**.
+2. Go to **Settings → Functions & Security** (or **Security / Protection**, depending on UI version).
+3. Look for **Password Protection**, **Access Control**, or **Protection Level**.
+4. If it is set to **Protected** or requires a password, change it to **Public** (no password).
+5. Save the settings and trigger a new deployment (or click **Redeploy** on the latest deployment).
+
+After this, the app should be publicly accessible at your `*.vercel.app` URL without returning 401.
+
 ## Performance Tips
 
 Your app is already optimized for Vercel:

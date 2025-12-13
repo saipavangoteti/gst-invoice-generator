@@ -8,6 +8,10 @@
     {
       "src": "flask-app/static/**",
       "use": "@vercel/static"
+    },
+    {
+      "src": "flask-app/templates/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [

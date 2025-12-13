@@ -1,16 +1,6 @@
 import os
 import sqlite3
-import json
-from datetime import datetime, timedelta
-import io
-
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from flask import Flask, jsonify
 
 # Initialize Flask app with template and static folders
 app = Flask(
@@ -18,12 +8,15 @@ app = Flask(
     template_folder='templates',
     static_folder='static'
 )
+
+# Configuration
 app.config.update(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-key-123'),
     DATABASE=os.path.join(os.path.dirname(__file__), 'database/billing.db')
 )
 
-DATABASE = 'database/billing.db'
+# Ensure the database directory exists
+os.makedirs(os.path.dirname(app.config['DATABASE']), exist_ok=True)
 
 # Database initialization
 def init_db():
@@ -127,23 +120,101 @@ def init_db():
     conn.close()
 
 # Initialize database on first request
-@app.before_first_request
-def initialize_database():
-    db_dir = os.path.dirname(app.config['DATABASE'])
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    init_db()
+with app.app_context():
+    from flask import current_app
+    db_dir = os.path.dirname(current_app.config['DATABASE'])
+    os.makedirs(db_dir, exist_ok=True)
+    
+    # Initialize database tables
+    conn = sqlite3.connect(current_app.config['DATABASE'])
+    c = conn.cursor()
+    
+    # Create tables if they don't exist
+    c.execute('''CREATE TABLE IF NOT EXISTS products
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  description TEXT,
+                  price REAL NOT NULL,
+                  gst_rate REAL NOT NULL,
+                  hsn_code TEXT,
+                  stock_quantity INTEGER DEFAULT 0)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS clients
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  email TEXT,
+                  phone TEXT,
+                  address TEXT,
+                  gstin TEXT,
+                  state TEXT)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS invoices
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  invoice_number TEXT NOT NULL,
+                  client_id INTEGER,
+                  issue_date DATE,
+                  due_date DATE,
+                  status TEXT,
+                  subtotal REAL,
+                  tax_amount REAL,
+                  discount REAL,
+                  grand_total REAL,
+                  notes TEXT,
+                  FOREIGN KEY (client_id) REFERENCES clients(id))''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS invoice_items
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  invoice_id INTEGER,
+                  product_id INTEGER,
+                  quantity INTEGER,
+                  unit_price REAL,
+                  gst_rate REAL,
+                  total REAL,
+                  FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+                  FOREIGN KEY (product_id) REFERENCES products(id))''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS company_settings
+                 (id INTEGER PRIMARY KEY,
+                  company_name TEXT,
+                  address TEXT,
+                  city TEXT,
+                  state TEXT,
+                  pincode TEXT,
+                  gstin TEXT,
+                  phone TEXT,
+                  email TEXT,
+                  terms_and_conditions TEXT,
+                  banking_details TEXT)''')
+    
+    # Insert default company settings if none exist
+    c.execute("SELECT COUNT(*) FROM company_settings")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO company_settings 
+                     (id, company_name, address, city, state, pincode, gstin, phone, email, terms_and_conditions, banking_details)
+                     VALUES (1, 'Your Company Name', 'Your Address', 'City', 'State', '000000', 
+                             'GSTIN Number', 'Phone', 'email@example.com', '', '')''')
+    
+    conn.commit()
+    conn.close()
 
 # Helper function to get database connection
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(app.config['DATABASE'])
     conn.row_factory = sqlite3.Row
     return conn
 
-# Routes
+# Simple health check route
 @app.route('/')
 def index():
-    return render_template('dashboard.html')
+    return "GST Invoice Generator is running"
+
+# Import routes after app is created to avoid circular imports
+from flask import render_template, request, send_file, redirect, url_for, jsonify
+
+# Add your existing routes below
+@app.route('/dashboard')
+def dashboard():
+    return render_template('index.html')
 
 @app.route('/invoices')
 def invoices():
@@ -421,5 +492,8 @@ def get_dashboard_stats():
         'recent_invoices': [dict(row) for row in recent_invoices]
     })
 
-# This file is used by Vercel to run the application
+# This makes the app variable available to Vercel
 # No main block needed for Vercel deployment
+
+# Vercel requires the app variable to be accessible
+# This file is used as the entry point for the Vercel Python runtime

@@ -203,18 +203,18 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-# Simple health check route
+# Main dashboard route
 @app.route('/')
 def index():
-    return "GST Invoice Generator is running"
+    return render_template('dashboard.html')
 
 # Import routes after app is created to avoid circular imports
 from flask import render_template, request, send_file, redirect, url_for, jsonify
 
-# Add your existing routes below
+# Dashboard route (redirects to home)
 @app.route('/dashboard')
 def dashboard():
-    return render_template('index.html')
+    return redirect(url_for('index'))
 
 @app.route('/invoices')
 def invoices():

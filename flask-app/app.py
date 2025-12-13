@@ -1,18 +1,27 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+import os
 import sqlite3
 import json
 from datetime import datetime, timedelta
+import io
+
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-import io
-import os
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+# Initialize Flask app with template and static folders
+app = Flask(
+    __name__,
+    template_folder='templates',
+    static_folder='static'
+)
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-key-123'),
+    DATABASE=os.path.join(os.path.dirname(__file__), 'database/billing.db')
+)
 
 DATABASE = 'database/billing.db'
 
@@ -117,10 +126,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize database on startup
-with app.app_context():
-    if not os.path.exists('database'):
-        os.makedirs('database')
+# Initialize database on first request
+@app.before_first_request
+def initialize_database():
+    db_dir = os.path.dirname(app.config['DATABASE'])
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
     init_db()
 
 # Helper function to get database connection
@@ -410,5 +421,5 @@ def get_dashboard_stats():
         'recent_invoices': [dict(row) for row in recent_invoices]
     })
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+# This file is used by Vercel to run the application
+# No main block needed for Vercel deployment

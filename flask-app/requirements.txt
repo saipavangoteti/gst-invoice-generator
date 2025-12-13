@@ -1,4 +1,4 @@
-# Core Flask
+# Core Dependencies
 Flask==3.0.0
 Werkzeug==3.0.1
 Jinja2==3.1.2
@@ -10,6 +10,3 @@ Pillow==10.2.0
 
 # Utilities
 python-dateutil==2.8.2
-
-# Vercel Python Runtime
-vercel==0.0.1
